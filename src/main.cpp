@@ -11,10 +11,10 @@ using json = nlohmann::json;
 
 int main() {
   MongoDB::Instance();
-  /* mongoDB URL */
-  MongoDB mongo("mongodb://localhost:27017");
-  /* bitcoin-core RPC URL, USERNAME:PASSWORD */
-  BitcoinCore bitcoinCore("http://localhost:8332", "username:password");
+  /* 저장할 MongoDB URL */
+  MongoDB mongo("mongodb://localhost:27017"); 
+  /* bitcoin-cor RCP URL, 계정:패스워드 */
+  BitcoinCore bitcoinCore("http://localhost:8332", "account:password");
   ProcessData processData(bitcoinCore, mongo);
   int startBlock;
   int lastBlock;
@@ -43,7 +43,7 @@ int main() {
         resultLog.close();
 
         /* update collection 업데이트 */
-        mongo.UpdateHeight(startBlock);
+        mongo.UpdateHeight();
 
       } catch (string exception) {
         cout << exception << endl;

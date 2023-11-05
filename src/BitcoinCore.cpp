@@ -1,6 +1,7 @@
 #include "BitcoinCore.hpp"
 
 #include <curl/curl.h>
+#include <unistd.h>
 
 #include <cmath>
 #include <iostream>
@@ -22,13 +23,7 @@ json BitcoinCore::GetBlock(const string &blockhash, int verbosity) {
   return Send("getblock", "\"" + blockhash + "\", " + to_string(verbosity));
 }
 json BitcoinCore::GetRawTransaction(const string &txid) {
-  json rawData = Send("getrawtransaction", txid + ", true");
-  long long value;
-  for (auto &vout : rawData["vout"]) {
-    value = (double)vout["value"] * pow(10, 9);
-    vout["value"] = value;
-  }
-  return rawData;
+  return Send("getrawtransaction", '"' + txid + "\", true");
 }
 
 size_t BitcoinCore::WriteCallback(void *contents, size_t size, size_t nmemb,
@@ -46,8 +41,15 @@ json BitcoinCore::Send(const string &method, const string &params) {
         "params": [)" +
                 params + R"(]
     })";
-
-  return SendCurl(data);
+  for (int i = 0; i < 10; i++) {
+    try {
+      return SendCurl(data);
+    } catch (int &err) {
+      sleep(1);
+      continue;
+    }
+  }
+  exit(0);
 }
 
 json BitcoinCore::Send(const string &method) {
@@ -82,10 +84,13 @@ json BitcoinCore::SendCurl(const string &data) {
       cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res)
            << std::endl;
     }
-
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
   }
-  json jsonRes = json::parse(readBuffer);
-  return jsonRes["result"];
+  try {
+    json jsonRes = json::parse(readBuffer);
+    return jsonRes["result"];
+  } catch (json::parse_error &e) {
+    throw -1;
+  }
 }

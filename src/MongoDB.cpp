@@ -36,38 +36,71 @@ int MongoDB::GetSavedHeight() {
     auto height = result->view()["height"];
     return height.get_int32().value;
   } else {
-    auto doc = make_document(kvp("height", 0), kvp("time", time(NULL)));
+    auto doc = make_document(kvp("height", 0), kvp("index", 0),
+                             kvp("time", time(NULL)));
     updateCol.insert_one(doc.view());
 
     return 0;
   }
 }
 
-void MongoDB::UpdateHeight(int saveBlock) {
-  auto doc = make_document(kvp("$set", make_document(kvp("height", saveBlock),
-                                                     kvp("time", time(NULL)))));
+int MongoDB::GetSavedIndex() {
+  auto result = updateCol.find_one({});
+
+  auto index = result->view()["index"];
+  return index.get_int32().value;
+}
+
+void MongoDB::UpdateHeight() {
+  auto doc = make_document(
+      kvp("$inc", make_document(kvp("height", 1))),
+      kvp("$set", make_document(kvp("index", 0), kvp("time", time(NULL)))));
   updateCol.update_many({}, doc.view());
+}
+void MongoDB::UpdateIndex() {
+  auto doc = make_document(kvp("$inc", make_document(kvp("index", 1))));
+  try {
+    updateCol.update_many({}, doc.view());
+  } catch (string& err) {
+    cout << "update index err" << endl;
+  }
 }
 
 json MongoDB::GetWalletData(string addr) {
-  auto result = walletCol.find_one(make_document(kvp("address", addr)));
-  if (result)
-    return json::parse(bsoncxx::to_json(*result));
-  else {
-    return {};
+  try {
+    auto result = walletCol.find_one(make_document(kvp("address", addr)));
+    if (result) {
+      return json::parse(bsoncxx::to_json(*result));
+    }
+  } catch (string& err) {
+    cout << "GetWalletData err" << endl;
   }
+
+  return {};
 }
 
 void MongoDB::StoreWalletData(json& data) {
   auto document = bsoncxx::from_json(data.dump());
-  walletCol.insert_one(document.view());
+  try {
+    walletCol.insert_one(document.view());
+  } catch (string& err) {
+    cout << "storewallet err" << endl;
+  }
 }
 
-void MongoDB::UpdateWalletData(string id, json& updateData) {
+void MongoDB::UpdateWalletData(string id, string& txid) {
   string oid_value = id.substr(9, 24);
-  walletCol.update_one(
-      make_document(kvp("_id", bsoncxx::oid(oid_value))),
-      make_document(kvp("$set", bsoncxx::from_json(updateData.dump()))));
+  auto updateData = make_document(
+      kvp("$push",
+          make_document(kvp("txs", make_document(kvp("$each", make_array(txid)),
+                                                 kvp("$position", 0))))),
+      kvp("$inc", make_document(kvp("n_tx", 1))));
+  try {
+    walletCol.update_one(make_document(kvp("_id", bsoncxx::oid(oid_value))),
+                         updateData.view());
+  } catch (string& err) {
+    cout << "update one err" << endl;
+  }
 }
 
 void MongoDB::Instance() { mongocxx::instance inst{}; }

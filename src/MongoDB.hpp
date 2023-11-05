@@ -12,11 +12,13 @@ class MongoDB {
   MongoDB(string);
   void CreateIndexes();
   static void Instance();
-  void UpdateHeight(int);
+  void UpdateHeight();
+  void UpdateIndex();
   int GetSavedHeight();
+  int GetSavedIndex();
   json GetWalletData(string);
   void StoreWalletData(json &);
-  void UpdateWalletData(string, json &);
+  void UpdateWalletData(string, string &);
 
  private:
   mongocxx::client client;
